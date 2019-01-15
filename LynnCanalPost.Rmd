@@ -1,0 +1,152 @@
+---
+title: "2018 Lynn Canal MAGMA"
+date: "01/14/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+
+```{r libraries, message = FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+  p_load(tidyverse) # use pacman to load or install+load necessary packages
+
+#source("C:/R/function_gcl.r")
+```
+
+<b> Project Overview </b> 
+
+This is a post-season analysis of Lynn Canal D115 fishery. I want an age-specific stock composition for all major contributing age classes (>5%; 1.2, 1.3, 2.2, 2.3, other) using mark- and age-enhanced genetic mixed-stock analysis (MAGMA).    
+
+For the purposes of this project, I am just concerend about the breakdown by age, across all statweeks, and statareas. I will assign <b>all</b> stat areas as 115-<i>00</i>, since this doesnt exist and is currently how stat area is recorded.    
+ 
+Total season estimates are to be provided by age group. The algorithm will be run for 40 000 repititions, and the first 20 000 repititions will be discarded.    
+
+Deliverables: 
+    
+    Point estimates, Credibility intervals
+
+
+### Load Metadata ###
+
+First, load the metadata, which was exported from OceanAK and perform QA.     
+
+I will rearrange, check missingness, verify genetic info, and check for dupoliocate entries since we had the whatman card isue with leading zeros vs 1xxxxx####.
+
+```{r prepdata}
+metadata <-
+  read_csv(file = "../../Lynn Canal Inseason/2018/Raw ASL/Sockeye_D115_2018_SW34_Harvest - Detailed ASL Samples.csv")
+
+unique(metadata$`Stat Area`) # gives unique values for subdistricts.
+
+metadata <- metadata %>%
+  mutate(stat_area = "115-00") # assign all samples as 115-00
+
+unique(metadata$stat_area) # verify no NAs remain and all stat areas look okay or are as expected.
+
+sum(is.na(metadata$`Dna Specimen No`)) # Check for missing DNA data, should be 0 if no missing data 
+
+sum(!is.na(metadata$`Thermal Mark Id`)) # Check for hatchery fish in the sample.
+```
+#### Detect duplicate whatman cards
+```{r}
+duplicate_cards <- metadata %>% 
+  group_by(`Dna Specimen No`) %>% 
+  filter( n() > 1) # verify that there are no duplicate whatmancard_positions (i.e., duplicate cards since DNA Specimen No is a concatenation of Whatman card number and fish number. 
+
+duplicate_cards # Check the duplicate list. If zero then congrats, you can pass go and collect $200, or whatever. 
+
+# <b> Fix any issues here </b>
+
+rm(duplicate_cards) # remove duplicate object since we have fixed any issues by now. 
+```
+
+#### Check out the data since its loaded and cleaned up. Also, see if we can identify any issues.
+```{r Visualization}
+metadata %>%
+  filter(!is.na(`Dna Specimen No`)) %>%
+  ggplot(aes(x = `Stat Week`, fill = District)) +
+  geom_bar() +
+  xlim( min(metadata$`Stat Week`),  max(metadata$`Stat Week`)) +
+  ylab("# DNA Samples") +
+  ggtitle("Samples by Stat Week for District 115")
+```
+
+
+I'll make a table for the total DNA samples in each district, for each statisical week.    From here, I'll calculate proportions of the total harvest by week for each area. 
+
+```{r}
+ASL <- metadata %>% 
+  select(c(`Stat Week`, stat_area, `Dna Specimen No`)) %>%  # subset stat week and location information
+  separate(stat_area, "-(?=[^-]*$)",
+           into = c("district", "statarea"),
+           remove = TRUE) %>%  # Split location information at the hyphen and remove the old 'stat_area' column
+  unite(distsub, c(district, statarea), sep = "-", remove = FALSE)
+```
+
+
+Now, let's create a few summary tables so we can see what we're looking at. The summaries will be by stat week ("SW") and by District.    
+
+ The total number of samples avaialble:
+```{r}
+total_samples <- ASL %>% 
+  group_by( `Stat Week`, distsub) %>% 
+  summarize( n = n()) %>% 
+  ungroup() %>% 
+  spread( distsub, n, fill = 0) # Total number of samples by stat week
+
+total_samples %>% 
+  select(-`Stat Week`) %>% 
+  summarize_all( funs(sum)) # Total number of samples for each stat area (this case just -00)
+
+sum(total_samples[-(1)]) # Grand total of samples, first column (stat week) is removed for calculations. 
+```
+
+#### Harvest Data ####
+
+I'm going to load in the harvest data for the 2018 season so I can check otut he harvest by district and by stat week.  
+
+
+```{r}
+harvest <- read_csv(file = "../../Lynn Canal Inseason/2018/Harvest/ft - Detailed Fish Tickets.csv")
+
+harvbest <- harvest %>% 
+  unite_("DISTSUB", c("DISTRICT", "SUBDISTRICT"), remove = FALSE)
+
+harvest
+```
+
+
+Check out the data since its loaded and cleaned up. Also, see if we can identify any issues.    
+```{r}
+catch %>% 
+  ggplot(aes(x = `Stat Week`, y = Sockeye, fill = DISTRICT)) +
+  geom_col() +
+  facet_wrap(~ `DISTSUB`) +
+  xlim(25, 35) + 
+  ylab("# Harvested") +
+  ggtitle("Catch by Stat Week for Districts 106, 108, and 111")
+#### Selecting the number of samples to run ### 
+```
+
+
+Now, create a table of harvest by statweek and subdistrict. 
+
+```{r}
+harvest18 <- catch %>% 
+  group_by(`Stat Week`, DISTSUB) %>% 
+  summarize( Sockeye) %>% 
+  ungroup() %>% 
+  spread(DISTSUB, Sockeye, fill = 0)
+  
+
+harvest18 
+
+
+sum(harvest18 [-(1)]) # total number of samples, first column (stat week) is removed for calculations. 
+```
+
