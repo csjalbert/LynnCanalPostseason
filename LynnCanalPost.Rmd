@@ -15,7 +15,7 @@ creator: Chase Jalbert
 if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
   p_load(tidyverse) # use pacman to load or install+load necessary packages
 
-#source("C:/R/function_gcl.r")
+source("C:/R/function_gcl.r")
 ```
 
 <b> Project Overview </b> 
@@ -31,7 +31,19 @@ Deliverables:
     Point estimates, Credibility intervals
 
 
-### Load Metadata ###
+### Make MAGMA directory structure ###
+
+```{r create_dirs}
+dir.create(file.path("../2018/", "MAGMA")) # create MAGMA directory. Note that dir.create will not overwrite, it just warns that it is already in existence.
+
+dir.create(file.path("../2018/MAGMA", "analysis")) # create analysis subdir. Note that dir.create will not overwrite, it just warns that it is already in existence.
+
+dir.create(file.path("../2018/MAGMA", "data")) # create data subdir. Note that dir.create will not overwrite, it just warns that it is already in existence.
+
+dir.create(file.path("../2018/MAGMA", "output")) # create output subdir. Note that dir.create will not overwrite, it just warns that it is already in existence.
+```
+
+### 1) Load ASL Metadata ###
 
 First, load the metadata, which was exported from OceanAK and perform QA.     
 
@@ -53,7 +65,7 @@ sum(is.na(metadata$`Dna Specimen No`)) # Check for missing DNA data, should be 0
 sum(!is.na(metadata$`Thermal Mark Id`)) # Check for hatchery fish in the sample.
 ```
 #### Detect duplicate whatman cards
-```{r}
+```{r dup_check}
 duplicate_cards <- metadata %>% 
   group_by(`Dna Specimen No`) %>% 
   filter( n() > 1) # verify that there are no duplicate whatmancard_positions (i.e., duplicate cards since DNA Specimen No is a concatenation of Whatman card number and fish number. 
@@ -79,7 +91,7 @@ metadata %>%
 
 I'll make a table for the total DNA samples in each district, for each statisical week.    From here, I'll calculate proportions of the total harvest by week for each area. 
 
-```{r}
+```{r ASL_import}
 ASL <- metadata %>% 
   select(c(`Stat Week`, stat_area, `Dna Specimen No`)) %>%  # subset stat week and location information
   separate(stat_area, "-(?=[^-]*$)",
@@ -92,7 +104,7 @@ ASL <- metadata %>%
 Now, let's create a few summary tables so we can see what we're looking at. The summaries will be by stat week ("SW") and by District.    
 
  The total number of samples avaialble:
-```{r}
+```{r total_avail_samples}
 total_samples <- ASL %>% 
   group_by( `Stat Week`, distsub) %>% 
   summarize( n = n()) %>% 
@@ -106,7 +118,106 @@ total_samples %>%
 sum(total_samples[-(1)]) # Grand total of samples, first column (stat week) is removed for calculations. 
 ```
 
-#### Harvest Data ####
+For MAGMA, I need a specific tab-delimited format as shown here:
+    
+    SILLY_VIAL	YEAR	STAT_WEEK	DISTRICT	SUBDISTRICT	AGE_EUROPEAN	SOURCE    
+    SGILL17D6_831801	2017	25	106	41	13	WILD    
+    SGILL17D6_831802	2017	25	106	41	13	TAHL    
+    SGILL17D6_831803	2017	25	106	41	13	WILD    
+    SGILL17D6_831804	2017	25	106	41	NA	WILD 
+
+The next few lines will create the fields and forms necessary. Briefly, I will make the SILLY code, pull fishery information (SW, DIST, SUB), and age. Finally, I will add the fish number (VIAL), which is done via a LOKI lookup. 
+
+```{r}
+# Build columns containing parts of the silly. Note to future self: The code probably fails on Districts with zeros (e.g., 106). In our example, the silly would be SGILL18D06, instead of just D6. Would need to toss in a str_remove or something similar to fix. In this case I just have D115 so don't really care for the extra line.
+
+metadata$SILLY <- paste0(
+  "SGILL",
+  substr(metadata$Year, start = 3, stop = 4),
+  "D" ,
+  substr(metadata$stat_area, start = 2, stop = 3)
+)
+```
+
+Now, import the LOKI genetic data so I can pair FISHID. For this I will have to create the Dna Specimen No, similar to the ASL data, then join FK_FISH_ID back to the metadata. I'll turn this into VIAL for the SILLY_VIAL input column. 
+
+```{r read_loki}
+loki <-
+  read_csv(file = "../2018/MAGMA/GEN_SAMPLED_FISH_TISSUE.csv") %>%
+  select(c (FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE))
+
+```
+
+First do a bit of doublechecking to make sure there is nothing goofy going on with the card numbers. 
+```{r loki_dups}
+loki$whatmancard <-
+  str_sub(loki$DNA_TRAY_CODE, start = -4) # get last four digits of the whatman card
+
+(whatman_issues <- loki %>%
+  unite(whatmancard,
+        c("whatmancard", "DNA_TRAY_WELL_CODE"),
+        sep = "_",
+        remove = FALSE) %>%
+  group_by(whatmancard)  %>%
+  summarize(n = n()) %>%
+  filter(n > 1)
+  ) # This should be ZERO!    If anything else then there is a duplicate whatman card somewhere. The code joins the temporary dupchk column with whatman position, then counts the number of occurances, and displays only those greater than 1
+
+rm(whatman_issues) # all okay in this case
+```
+
+```{r loki_join}
+#$whatmancard <- gsub("(?<![0-9])0+", "", loki$whatmancard, perl = TRUE) # remove leading zeros from the tray code field. Note that this is a good way to do a quick check of codes starting with 1's. 
+
+loki$DNA_TRAY_WELL_CODE <-
+  sprintf("%02d", as.numeric(loki$DNA_TRAY_WELL_CODE)) # pad all single digit whatman card spots with zeros (e.g., 1 = 01).
+
+loki <- loki %>%
+  unite(
+    `Dna Specimen No`,
+    c("whatmancard", "DNA_TRAY_WELL_CODE"),
+    sep = "",
+    remove = TRUE
+  ) %>%
+  select(-DNA_TRAY_CODE)
+
+loki$`Dna Specimen No` <-
+  as.numeric(loki$`Dna Specimen No`) # convert to numeric so join is acting on same type of data
+
+metadata <-
+  left_join(x = metadata, y = loki, by = "Dna Specimen No") # join by Dna Specimen No, leaving FISHID (VIAL)
+
+rm(loki) # remove temporary loki dataframe
+
+metadata <- metadata %>%
+  unite(SILLY_VIAL,
+        c(SILLY, FK_FISH_ID),
+        sep = "_",
+        remove = TRUE)  # use  parts above to build SILLY_VIAL
+
+# now build district and subdistrict then order columns in the correct order.
+metadata <- metadata %>%
+  separate(
+    col = stat_area,
+    into = c("DISTRICT", "SUBDISTRICT"),
+    sep = "-",
+    remove = TRUE
+  ) %>%
+  rename(
+    YEAR = Year,
+    STAT_WEEK = `Stat Week`,
+    AGE_EUROPEAN = `Age European`,
+    SOURCE = `Thermal Mark Id`
+  ) %>%
+  mutate(SOURCE = replace_na(SOURCE, "WILD")) %>%
+  select(SILLY_VIAL , everything(), -`Dna Specimen No`)
+
+metadata$SOURCE <-
+  str_sub(metadata$SOURCE, start = 1, end = 4) # only leave first four letters of source
+```
+
+
+#### 2) Harvest Data ####
 
 I'm going to load in the harvest data for the 2018 season so I can check otut he harvest by district and by stat week.  
 
