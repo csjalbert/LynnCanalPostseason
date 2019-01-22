@@ -1,0 +1,129 @@
+---
+title: "2018 Lynn Canal MAGMA Baseline Setup"
+date: "01/22/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+
+```{r libraries, message = FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+  p_load(tidyverse) # use pacman to load or install+load necessary packages
+
+source("C:/R/function_gcl.r")
+```
+
+There was a substaintial baseline update in 2018 so I am re-working this setup script to accomodate the changes. For details see README by Kyle Shedd in the 2018 Lynn Canal Inseason folder.    
+
+I will rely on the "Lynn Canal Inseason 7 Reporting Groups 239 Poupluations 2018.csv" located within that folder for pop, group, and silly vecs.    
+
+Also, I am only interested in 4 groups:    
+    
+    c("Other", "ChilkatLake", "ChilkatMain", "Chilkoot") 
+
+Anything that is NOT in "ChilkatLake", "ChilkatMain", or "Chilkoot" will be grouped into "Other" for these analyses. 
+
+```{r locus_setup, echo = FASLE}
+username = "csjalbert"
+.password = "esox.1234"
+```
+
+
+```{r locus_control}
+CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci", username = username, password = .password)
+```
+
+```{r locus_setup}
+groups7_pops239 <-
+  read_csv(file = "../../Lynn Canal Inseason/2018/Lynn Canal Inseason 7 Reporting Groups 239 Poupluations 2018.csv") # load in updated baseline info
+
+
+(unique(groups7_pops239$Reporting.Group.New)) # view current reporting groups.
+
+
+groups4_pops239 <- groups7_pops239 %>%
+  mutate(
+    GROUPS = case_when(
+      Reporting.Group.New == "Snettisham" ~ "Other",
+      Reporting.Group.New == "Juneau Mainland" ~ "Other",
+      Reporting.Group.New == "Taku River/Stikine Mainstem" ~ "Other",
+      TRUE ~ as.character(Reporting.Group.New)
+    )
+  ) # changing all unnecessary groups to "Others" for MAGMA
+
+loci <- LocusControl$locusnames # should be 48 loci from above
+
+OrderedPops <- groups4_pops239$SILLY
+
+pooled.gcls <- paste(groups4_pops239$SILLY, ".gcl", sep = "")
+```
+
+
+```{r create_baseline, echo = FASLSE}
+# get updated silly list from the new inseason -created baseline...
+load_sillys("../../Lynn Canal Inseason/2018/Baseline genotpyes/")
+
+# Dput baseline sillys
+invisible( sapply( OrderedPops, function(silly) {
+  dput(
+    x = get( paste( silly, ".gcl", sep = '')),
+    file = paste(
+      "../2018/baseline/" ,
+      silly,
+      ".txt",
+      sep = ''
+    )
+  )
+}))
+
+search()
+detach(pos = 2)
+
+sapply( OrderedPops, function(silly) {
+  assign(
+    x = paste(silly, ".gcl", sep = ""),
+    value = dget(
+      file = paste(
+        "../2018/baseline/",
+        silly,
+        ".txt",
+        sep = ""
+      )
+    ),
+    pos = 1
+  )
+})
+
+
+loci2remove <-
+  c("One_Cytb_26",
+    "One_CO1",
+    "One_Cytb_17",
+    "One_c3-98",
+    "One_GPDH",
+    "One_MHC2_251")
+
+loci <-
+  LocusControl$locusnames[!LocusControl$locusnames %in% loci2remove]
+```
+
+
+```{r cleanup}
+#removing anything not required for MAGMA
+rm(username)
+rm(.password)
+
+rm(list = ls(pattern = ".GCL"))
+
+rm(groups4_pops239)
+rm(groups7_pops239)
+
+#the final total list of objects in this workspace includes: loci, LocusControl, OrderedPops, and 239 baseline .gcls 01/22/2019
+save.image("../2018/MAGMA/data/baseline.RData")
+```
+
