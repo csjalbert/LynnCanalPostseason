@@ -1,0 +1,88 @@
+---
+title: "2018 Lynn Canal MixtureScript"
+date: "01/22/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+
+```{r libraries, message = FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+  p_load(tidyverse) # use pacman to load or install+load necessary packages
+
+source("C:/R/function_gcl.r")
+```
+
+##### Mixture read-in and Prep ####################################
+
+```{r mix_prep}
+username <- "csjalbert"
+
+.password <- "esox.1234"
+
+sillyvecMix <- c("SGILL18D15")
+
+
+CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci",
+                       username = username,
+                       password = .password)
+
+read_time <-
+  LOKI2R.GCL(sillyvec = sillyvecMix,
+             username =  username,
+             password = .password)
+
+rm(username, .password)
+```
+ 
+
+#### Data Massage ####################################
+
+```{r mix_datafix}
+ColSize <-
+  sapply(paste(sillyvecMix, ".gcl", sep = ''), function(x)
+    get(x)$n)
+
+RemoveMissing <-
+  RemoveIndMissLoci.GCL(sillyvecMix, proportion = 0.8)
+
+MyDupCheck <-
+  CheckDupWithinSilly.GCL(sillyvecMix, loci = LocusControl$locusnames, quantile = NULL)
+
+RemoveDups <- RemoveDups.GCL(MyDupCheck)
+
+
+loci2remove <-
+  c("One_Cytb_26",
+    "One_CO1",
+    "One_Cytb_17",
+    "One_c3-98",
+    "One_GPDH",
+    "One_MHC2_251")
+
+loci <-
+  LocusControl$locusnames[!LocusControl$locusnames %in% loci2remove]
+
+names(loci) <- loci
+
+nloci <- length(loci)
+
+nalleles <- LocusControl$nalleles[loci]
+```
+
+
+```{r export_rdata}
+save.image("../2018/MAGMA/data/mixture.RData")
+```
+
+  
+  
+  
+  
+  
+  
