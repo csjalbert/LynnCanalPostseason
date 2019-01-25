@@ -1,0 +1,68 @@
+---
+title: "2018 Lynn Canal MAGMA workspace"
+date: "01/22/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+
+This notebook sets up the MAGMA workspace. The mnain function is to run the magma_data.R function. The required inputs are:
+    
+    wd
+    loci_name = "loci"
+    wildpops_name = "OrderedPops"
+    years2run = 2018
+    age_classes = c("12", "13", "22", "23", "not")
+    
+Previously, MAGMA was created and used for TBR only. Now, we are expanding so the function was fixed and some hard-coded flags removed allowwing for more versatility. This means that you will be required to enter ALL inputs, at all times. 
+
+```{r}
+source("data/magma_data.R")
+
+magma_data(wd = "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/", loci_name = "loci", wildpops_name = "OrderedPops", years2run = 2018, age_classes = c("12", "13", "22", "23", "not")) 
+
+load("../MAGMA/analysis/magma_data.RData")
+```
+
+
+### Double Checking ###
+
+This is old and simply serves to double check work done in excel, can likely be deleted. 
+```{r}
+# Getting sample sizes
+# District totals
+sum(metadat$d == "1") # 3410
+
+## Total number of wild samples
+sum(is.na(metadat$i)) # 3410
+
+require(reshape)
+
+colsum <- function(x, group, reorder = TRUE, ...) t(rowsum(t(x), group = group, reorder = reorder, ...))
+
+ntab <- as.data.frame.table(x = tapply(metadat$i, metadat[, -c(ncol(metadat) - 1, ncol(metadat))], length), responseName = "n_total")
+
+ntab <- merge(x = ntab, y = as.data.frame.table(tapply(colsum(x, group = c(rep(1, sum(nalleles)), rep(2, T * C)))[, 1] != 0 & is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "wild_genetics"))
+
+ntab <- merge(x = ntab, y = as.data.frame.table(tapply(colsum(x, group = c(rep(1, sum(nalleles)), rep(2, T * C)))[, 1] == 0 & is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "wild_no_genetics"))
+
+ntab <- merge(x = ntab, y = as.data.frame.table(tapply(!is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "non_wild"))
+
+ntab$w <- factor(ntab$w, seq(W)) 
+
+harvest$STAT_WEEK <- factor(harvest$STAT_WEEK, seq(W))
+
+colnames(ntab)[seq(ncol(harvest) - 1)] <- colnames(harvest)[seq(ncol(harvest) - 1)]
+
+nhtab <- sort_df(merge(ntab, harvest)) 
+
+nhtab[is.na(nhtab)] <- 0
+```
+
+
+

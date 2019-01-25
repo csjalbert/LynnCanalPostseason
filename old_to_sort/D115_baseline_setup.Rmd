@@ -35,7 +35,9 @@ username = "csjalbert"
 
 
 ```{r locus_control}
-CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci", username = username, password = .password)
+rm(LocusControl) # make sure no old LocusControl
+
+CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci", username = username, password = .password) # make new Locus control
 ```
 
 ```{r locus_setup}
@@ -52,6 +54,8 @@ groups4_pops239 <- groups7_pops239 %>%
       Reporting.Group.New == "Snettisham" ~ "Other",
       Reporting.Group.New == "Juneau Mainland" ~ "Other",
       Reporting.Group.New == "Taku River/Stikine Mainstem" ~ "Other",
+      Reporting.Group.New == "Chilkat Mainstem" ~ "ChilkatMainstem",
+      Reporting.Group.New == "Chilkat Lake" ~ "ChilkatLake",
       TRUE ~ as.character(Reporting.Group.New)
     )
   ) # changing all unnecessary groups to "Others" for MAGMA
