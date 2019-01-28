@@ -1,0 +1,71 @@
+---
+title: "2018 Lynn Canal MAGMA Run"
+date: "01/28/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+<b> Project Overview </b> 
+
+This is a post-season analysis of Lynn Canal D115 fishery. I want an age-specific stock composition for all major contributing age classes (>5%; 1.2, 1.3, 2.2, 2.3, other) using mark- and age-enhanced genetic mixed-stock analysis (MAGMA).    
+
+For the purposes of this project, I am just concerend about the breakdown by age, across all statweeks, and statareas. I will assign <b>all</b> stat areas as 115-<i>00</i>, since this doesnt exist and is currently how stat area is recorded.    
+ 
+Total season estimates are to be provided by age group. The algorithm will be run for 40 000 repititions, and the first 20 000 repititions will be discarded.    
+
+Deliverables: 
+    
+    Point estimates, Credibility intervals
+    
+<b> Script Overview </b>
+
+Now that everything is setup and verified, the model is ready. Briefly, we run 40K repititions, burn the first 20k, and thin by 10, with 5 chains. If there are issues (e.g., no convergence) then we bump up to 80K, 40k, 100, 5, respectively. Here, I have provided both options, so uncomment whatever you need.   
+
+At this point, I will switch the scripts over to our genetics server and make use of some extra processing power.    
+
+<b> Begin MAGMA Run </b>
+
+Start with a 40K run: 
+
+```{r MAGMA40K}
+wd <- "C:/Analysis/MAGMA/LynnCanalPost_2018" # This must have three subdirectories, 1) analysis, 2) data, 3) output which contain the input files obtained by running MAGMA scripts 1 - 2. MAGMA will output to the 'output' directory
+
+setwd(wd)
+
+source("analysis/magma.R") # source the magma function
+
+magma(nreps = 40000, burn = 20000, thin = 10, nchains = 5, wd = wd) # run MAGMA
+```
+
+The run was stated on: xx/xx/xxxx at xxxx
+The run was completed on: xx/xx/xxxx at xxxx
+The total time was: xx
+
+OR CAN RUN AT 80K, if necessary... 
+
+```{r MAGMA80K}
+# wd <- "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/" # This must have three subdirectories, 1) analysis, 2) data, 3) output and they must contain the files obtained by running the setup above (Parts 1 - 3)
+# 
+# setwd(wd)
+# 
+# source("analysis/magma.R") # source the magma function
+# 
+# magma(nreps = 80000, burn = 40000, thin = 100, nchains = 5, wd = wd) # run MAGMA
+```
+
+The run was stated on: xx/xx/xxxx at xxxx
+The run was completed on: xx/xx/xxxx at xxxx
+The total time was: xx
+
+Once the run finishes move onto the next script "4-D115_MAGMA_summary.Rmd" to tidy up the output, check out convergence, and create summary reports.    
+
+In the spirit of record keeping:
+```{r sessioninfo}
+sessionInfo()
+```
+
