@@ -1,0 +1,250 @@
+---
+title: "2018 Lynn Canal MAGMA Workspace Setup"
+date: "01/28/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+<b> Project Overview </b> 
+
+This is a post-season analysis of Lynn Canal D115 fishery. I want an age-specific stock composition for all major contributing age classes (>5%; 1.2, 1.3, 2.2, 2.3, other) using mark- and age-enhanced genetic mixed-stock analysis (MAGMA).    
+
+For the purposes of this project, I am just concerend about the breakdown by age, across all statweeks, and statareas. I will assign <b>all</b> stat areas as 115-<i>00</i>, since this doesnt exist and is currently how stat area is recorded.    
+ 
+Total season estimates are to be provided by age group. The algorithm will be run for 40 000 repititions, and the first 20 000 repititions will be discarded.    
+
+Deliverables: 
+    
+    Point estimates, Credibility intervals
+    
+<b> Script Overview </b>
+
+This document performs all of the functions required to setup the MAGMA workspace and runs MAGMA. It relies on inputs obtained from the data_cleanup script. Generally, the script performs 1) baseline setup, 2) creates mixtures, 3) creates magma workspace(s), and 4) runs the model, in that order. The required inputs are: 
+    
+    1) group_names.txt - tab-delimited, column for each district and group name:
+        D115
+        Other
+        ChilkatMain
+        ...
+        
+    2) groups.txt - tab-delimited, "SOURCE" column with pooled SILLYs and a column for each district, with values representing which group_name they belong to:
+        SOURCE    D115
+        SBAIN10   1
+        SMAIN91   2
+        STANA05   1
+        ...
+        
+    3) harvest.txt - tab-delimited, total harvest broken down by district, subdistrict, stat_week
+    
+    4) metadata.txt - tab-delimited, metadata containing:
+        SILLY_VIAL	YEAR	STAT_WEEK	DISTRICT	SUBDISTRICT	AGE_EUROPEAN	SOURCE
+
+The outputs vary and will be discussed during each step below. 
+
+<b> Begin MAGMA Setup </b>
+
+#### 1) Baseline Setup ####
+
+Here, I am going to setup the baseline with the ultimate goal of getting "baseline.RData" in my \data directory. 
+
+```{r libraries, echo = FALSE, message = FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+  p_load(tidyverse) # use pacman to load or install+load necessary packages
+
+source("C:/R/function_gcl.r")
+```
+
+There was a substaintial baseline update in 2018 so I am utilizing the new baseline moving forward. For details see README by Kyle Shedd in the 2018 Lynn Canal Inseason directory.    
+
+I will rely on the "Lynn Canal Inseason 7 Reporting Groups 239 Poupluations 2018.csv" located within that folder for pop, group, and silly vecs.    
+
+Also, I am only interested in 4 groups:    
+    
+    c("Other", "ChilkatLake", "ChilkatMain", "Chilkoot") 
+
+This means anything that is NOT in "ChilkatLake", "ChilkatMain", or "Chilkoot" will be grouped into "Other" for these analyses. 
+
+```{r locus_setup, echo = FASLE}
+username = "username_goes_here"
+.password = "password_goes_here"
+```
+
+
+```{r locus_control}
+rm(LocusControl) # make sure no old LocusControl
+
+CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci", username = username, password = .password) # make new Locus control
+```
+
+```{r locus_setup}
+groups7_pops239 <-
+  read_csv(file = "../../Lynn Canal Inseason/2018/Lynn Canal Inseason 7 Reporting Groups 239 Poupluations 2018.csv") # load in updated baseline info
+
+
+(unique(groups7_pops239$Reporting.Group.New)) # view current reporting groups.
+
+
+groups4_pops239 <- groups7_pops239 %>%
+  mutate(
+    GROUPS = case_when(
+      Reporting.Group.New == "Snettisham" ~ "Other",
+      Reporting.Group.New == "Juneau Mainland" ~ "Other",
+      Reporting.Group.New == "Taku River/Stikine Mainstem" ~ "Other",
+      Reporting.Group.New == "Chilkat Mainstem" ~ "ChilkatMainstem",
+      Reporting.Group.New == "Chilkat Lake" ~ "ChilkatLake",
+      TRUE ~ as.character(Reporting.Group.New)
+    )
+  ) # changing all unnecessary groups to "Others" for MAGMA
+
+loci <- LocusControl$locusnames # should be 48 loci from above
+
+OrderedPops <- groups4_pops239$SILLY
+```
+
+
+```{r load_silly, echo = FALSE}
+load_sillys("../../Lynn Canal Inseason/2018/Baseline genotpyes/") # get updated silly list from the new baseline
+```
+
+
+```{r cleanup}
+#removing anything not required for MAGMA
+rm(username)
+rm(.password)
+
+rm(list = ls(pattern = ".GCL"))
+
+rm(groups4_pops239)
+rm(groups7_pops239)
+```
+
+Great, the baseline setup is complete and looks good (all 239 pops). Now I'll save "baseline.RData" to the MAGMA\data folder. This includes loci, LocusControl, OrderedPops, and all of the .gcl baseline objects.    
+
+```{r}
+save.image("../2019/MAGMA/data/baseline.RData") # save the baseline workspace
+```
+
+
+I am going to remove everything from the workspace prior to starting the next steps, <b>careful here</b>: 
+```{r baseline_cleaning}
+rm(list=ls())
+```
+
+#### 2) Create mixture data ####
+
+Now that the baseline is setup, I can prepare the mixture data. 
+
+```{r mixture_lib, echo = FALSE, message = FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+  p_load(tidyverse) # use pacman to load or install+load necessary packages
+
+source("C:/R/function_gcl.r")
+```
+
+Mixture read and prep
+
+```{r mixture_setup, echo = FASLE}
+username = "username_goes_here"
+.password = "password_goes_here"
+```
+
+```{r mixture_prep}
+sillyvecMix <- c("SGILL18D15") # vector of SILLYs
+
+CreateLocusControl.GCL(markersuite = "LynnCanal_PostSeason48loci",
+                       username = username,
+                       password = .password) 
+
+read_time <-
+  LOKI2R.GCL(sillyvec = sillyvecMix,
+             username =  username,
+             password = .password)
+
+rm(username, .password)
+```
+ 
+
+A bit of data tidying:
+
+```{r mixture_cleanup}
+ColSize <-
+  sapply(paste(sillyvecMix, ".gcl", sep = ''), function(x)
+    get(x)$n)
+
+RemoveMissing <-
+  RemoveIndMissLoci.GCL(sillyvecMix, proportion = 0.8) # get rid of anything missing greater than 80%
+
+MyDupCheck <-
+  CheckDupWithinSilly.GCL(sillyvecMix, loci = LocusControl$locusnames, quantile = NULL) # check for duplicates 
+
+RemoveDups <- RemoveDups.GCL(MyDupCheck) # remove any duplicates
+
+loci <-
+  LocusControl$locusnames # 48 loci from locus control
+
+names(loci) <- loci # get the loci names
+
+nloci <- length(loci) # total number of loci # should be 48...
+
+nalleles <- LocusControl$nalleles[loci] # list of number of allels per locus
+```
+
+
+```{r export_mixture}
+save.image("../2019/MAGMA/data/mixture.RData") # export the mixture workspace
+```
+
+The mixture setup is complete and there is a "mixture.RData" located within the MAGMA\data directory. This includes loci (named), LocusControl, sillyvecMix, nalleles, and nloci.    
+
+
+I am going to remove everything from the workspace prior to starting the next steps, <b>careful here</b>: 
+```{r mixture_delete}
+rm(list=ls())
+```
+
+#### 3) Create magma data ####
+
+The last step before running MAGMA is to create the magma_data workspace. This will be called "magma_data.Rmd" and will be located within the MAGAM\analysis directory. The main purpose is to run the magma_data.R function. The required inputs are:
+    
+    wd
+    loci_name = "loci"
+    wildpops_name = "OrderedPops"
+    years2run = 2018
+    age_classes = c("12", "13", "22", "23", "not")
+    
+Previously, MAGMA was created and used for TBR only. Now, we are expanding so the function was edited and some hard-coded flags removed allowwing for more versatility. This means that you will be required to enter ALL inputs, at all times. 
+
+```{r}
+source("magma_data.R") # sources the magma_data function
+
+magma_data(
+  wd = "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2019/MAGMA/", # set working directory
+  loci_name = "loci", # name of loci object
+  wildpops_name = "OrderedPops", # name of wild populations list
+  years2run = 2018, # can only run single year at a time
+  age_classes = c("12", "13", "22", "23", "not") # The age classes you are interested in. See magma_data.R function for detailed description of age_classes options.
+)
+
+load("../MAGMA/analysis/magma_data.RData") # just douuble checking our file
+```
+
+The magma_data workspace contains the group_names, groups, harvest, and metadata, as well as other associated data.
+
+I am going to remove everything from the workspace prior to starting the next steps, <b>careful here</b>: 
+```{r workspace_cleaning}
+rm(list=ls())
+```
+
+
+Great, now all of the required workspaces are setup and avaialble for MAGMA. Proceed to step 3 - running the model.    
+
+In the interest of record keeping: 
+```{r}
+sessionInfo()
+```
+
