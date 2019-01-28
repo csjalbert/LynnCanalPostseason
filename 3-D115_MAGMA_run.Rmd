@@ -37,6 +37,8 @@ wd <- "C:/Analysis/MAGMA/LynnCanalPost_2018" # This must have three subdirectori
 
 setwd(wd)
 
+set.seed(seed = 40201)
+
 source("analysis/magma.R") # source the magma function
 
 magma(nreps = 40000, burn = 20000, thin = 10, nchains = 5, wd = wd) # run MAGMA
@@ -53,6 +55,8 @@ OR CAN RUN AT 80K, if necessary...
 # 
 # setwd(wd)
 # 
+# set.seed(seed = 804010)
+#
 # source("analysis/magma.R") # source the magma function
 # 
 # magma(nreps = 80000, burn = 40000, thin = 100, nchains = 5, wd = wd) # run MAGMA
