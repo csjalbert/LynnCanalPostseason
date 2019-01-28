@@ -1,0 +1,481 @@
+---
+title: "2018 Lynn Canal MAGMA Summary"
+date: "01/25/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+This script takes the MAGMA output and creates summary files along with a summary workspace (RData). Essentially it works through each chain and compiles necessary statistics presenting them into a 
+
+```{r setup, include = FALSE}
+# This forces the working directory for ALL chunks in the notebook. Note that it must be run first, in the "setup" chunk or it will fail. 
+wd <-
+  "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/"
+
+knitr::opts_knit$set(root.dir = wd)
+
+```
+
+
+```{r arguments}
+args <-
+  dget("output/MAGMA_arguments.txt")  # This will get a list with the arguments used when magma.R was run, need to set wd first
+
+invisible(sapply(names(args)[1:4], function(arg) {
+  assign(x = arg, value = args[[arg]], pos = 1)
+}))  # This will load "nreps", "burn", "thin", and "nchains" to the workspace
+
+nreps
+
+burn
+
+thin
+
+nchains
+
+alpha <- 0.10
+
+zero <-
+  "halfafish" #  This uses half a fish as the threshold for zero (based on harvest). Otherwise can be set as a numeric e.g. zero = 5e-7.
+
+#  age_class <- new_age_class # You can re-specify this argument if u want to summarise ages withe respect to a different "age_class" vector.
+
+groups <-
+  read.table("data/groups.txt", header = TRUE, row.names = 1)
+
+group_names <- read.table("data/group_names.txt", header = TRUE)
+```
+
+First, compile and create the MAGMA summary workspace. 
+```{r magma_summary}
+startTime <- Sys.time()
+
+
+packages <- c("reshape", "coda", "readr")
+
+invisible( sapply( packages, function(pkg)
+  while (!require( pkg, character.only = TRUE))
+    install.packages(
+      pkg,
+      repos = c("http://rstudio.org/_packages", "http://cran.rstudio.com")
+    )))
+
+colsum <-
+  function(x, group, reorder = TRUE, ...)
+    t(rowsum(t(x), group = group, reorder = reorder, ...))
+
+#setwd(wd)
+
+load("analysis/magma_data.RData")
+
+# print(magma_data_names)
+
+#  c("harvest", "wildpops", "hatcheries", "age_classes", "age_class", "years2run", "districts", "subdistricts", "stat_weeks", "K", "H", "A", "C", "T", "D", "S", "W")
+
+harvest = sort_df(merge(harvest, Reduce(rbind, lapply(seq(
+  D
+), function(d) {
+  grd = expand.grid(
+    YEAR = seq(T),
+    DISTRICT = d,
+    SUBDISTRICT = seq(S[d]),
+    STAT_WEEK = seq(W),
+    stringsAsFactors = FALSE
+  )
+  sort_df(grd, vars = c("SUBDISTRICT", "STAT_WEEK"))
+})), all = TRUE))
+
+h <-
+  tapply(harvest[, ncol(harvest)], harvest[,-ncol(harvest)], c)
+
+n <-
+  tapply(metadat$i, metadat[,-c(ncol(metadat) - 1, ncol(metadat))], length)
+
+n[is.na(n)] <- h[is.na(h)] <- 0
+
+paths <-
+  lapply(seq(T), function(t) {
+    lapply(seq(D), function(d) {
+      lapply(seq(S[d]), function(s) {
+        lapply(seq(W), function(w) {
+          paste0("output/",
+                 years2run[t],
+                 "/D",
+                 districts[d],
+                 "/S",
+                 subdistricts[[d]][s],
+                 "/StatWeek",
+                 w)
+        })
+      })
+    })
+  })
+
+
+
+output <-
+  lapply(seq(T), function(t) {
+    lapply(seq(D), function(d) {
+      lapply(seq(S[d]), function(s) {
+        lapply(seq(W), function(w) {
+          lapply(seq(nchains), function(chain) {
+            rowgroup <-
+              factor(paste0(
+                rep(group_names[groups[, d], d], times = (nreps - burn) / thin),
+                rep(seq(burn + thin, nreps, by = thin), each = K + H)
+              ),
+              
+              levels = paste0(group_names[, d][!is.na(group_names[, d])], rep(
+                seq(burn + thin, nreps, by = thin),
+                each = length(group_names[, d][!is.na(group_names[, d])])
+              )))
+            
+            file <-
+              paste0(paths[[t]][[d]][[s]][[w]], "/PiP", t, d, s, w, "_Chain", chain, ".csv")
+            
+            
+            (n[t, d, s, w] > 0) * h[t, d, s, w] * rowsum(
+              colsum(
+                suppressMessages(read_csv(
+                  file = file, progress = FALSE
+                )),
+                group = factor(age_classes[age_class], levels = age_classes),
+                reorder = FALSE
+              ),
+              group = rowgroup,
+              reorder = FALSE
+            )[levels(rowgroup), age_classes]
+            
+          })
+        })
+      })
+    })
+  })
+
+endTime <- Sys.time()
+
+print(endTime - startTime)
+
+save.image("V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/output/D115summary40K.RData")
+```
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+###  ages & subdistricts combined by statweek
+
+```{r}
+  R <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ lapply(seq(W), function(w){ as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(S[d]), function(s){
+
+           INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+
+           xx = Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = INDEX, c, simplify = FALSE))
+
+           dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), levels(INDEX))
+
+           xx / max(1, sum((n[t, d, , w] > 0) * h[t, d, , w]))
+
+         }))) })) }) }) })
+
+  R_statweek <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){ Reduce(rbind, lapply(seq(W), function(w){
+
+                  zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, , w] > 0) * h[t, d, , w])))
+
+                  P0 <- apply(apply(Reduce(rbind, R[[t]][[d]][[w]]), 2, "<", value = zero), 2, mean)
+
+                  smmry <- Reduce(cbind, summary(R[[t]][[d]][[w]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+
+                  GR <- gelman.diag(R[[t]][[d]][[w]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+
+                  group = group_names[!is.na(group_names[, d]), d]
+
+                  suppressWarnings(data.frame(group = group_names[!is.na(group_names[, d]), d], year = years2run[t], district = districts[d], subdistrict = "all", statweek = stat_weeks[w], smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+
+                })) })) }))
+
+```
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+###  ages & statweeks combined by subdistrict
+
+  R <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ lapply(seq(S[d]), function(s){ as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(W), function(w){
+
+           INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+
+           xx = Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = INDEX, c, simplify = FALSE))
+
+           dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), levels(INDEX))
+
+           xx / max(1, sum((n[t, d, s, ] > 0) * h[t, d, s, ]))
+
+         }))) })) }) }) })
+
+  R_subdistrict <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){ Reduce(rbind, lapply(seq(S[d]), function(s){
+
+                  zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, s, ] > 0) * h[t, d, s, ])))
+
+                  P0 <- apply(apply(Reduce(rbind, R[[t]][[d]][[s]]), 2, "<", value = zero), 2, mean)
+
+                  smmry <- Reduce(cbind, summary(R[[t]][[d]][[s]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+
+                  GR <- gelman.diag(R[[t]][[d]][[s]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+
+                  suppressWarnings(data.frame(group = group_names[!is.na(group_names[, d]), d], year = years2run[t], district = districts[d], subdistrict = subdistricts[[d]][s], statweek = "all", smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+
+                })) })) }))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### ages, subdistricts and Stat Weeks Combined by district
+
+  R <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(S[d]), function(s){Reduce("+", lapply(seq(W), function(w){
+
+           INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+
+           xx = Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = INDEX, c, simplify = FALSE))
+
+           dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), levels(INDEX))
+
+           xx / max(1, sum((n[t, d, , ] > 0) * h[t, d, , ]))
+
+         })) }))) })) }) })
+
+  R_district <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){
+
+                  zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, , ] > 0) * h[t, d, , ])))
+
+                  P0 <- apply(apply(Reduce(rbind, R[[t]][[d]]), 2, "<", value = zero), 2, mean)
+
+                  smmry <- Reduce(cbind, summary(R[[t]][[d]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+
+                  GR <- gelman.diag(R[[t]][[d]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+
+                  suppressWarnings(data.frame(group = group_names[!is.na(group_names[, d]), d], year = years2run[t], district = districts[d], subdistrict = "all", statweek = "all", smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+
+                })) })) 
+
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+###  ages combined by subdistrict & statweeks 
+  
+  R <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ lapply(seq(S[d]), function(s){ lapply(seq(W), function(w){ as.mcmc.list(lapply(seq(nchains), function(chain){  
+    
+    INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+    
+    xx = Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = INDEX, c, simplify = FALSE))
+    
+    dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), levels(INDEX))
+    
+    mcmc(xx / max(1, sum((n[t, d, s, w] > 0) * h[t, d, s, w])))
+    
+  })) }) }) }) })
+  
+  R_subdistrict_statweek <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){ Reduce(rbind, lapply(seq(S[d]), function(s){ Reduce(rbind, lapply(seq(W), function(w){
+    
+    zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, s, w] > 0) * h[t, d, s, w])))
+    
+    P0 <- apply(apply(Reduce(rbind, R[[t]][[d]][[s]][[w]]), 2, "<", value = zero), 2, mean)
+    
+    smmry <- Reduce(cbind, summary(R[[t]][[d]][[s]][[w]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+    
+    GR <- gelman.diag(R[[t]][[d]][[s]][[w]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+    
+    suppressWarnings(data.frame(group = group_names[!is.na(group_names[, d]), d], year = years2run[t], district = districts[d], subdistrict = subdistricts[[d]][s], statweek = stat_weeks[w], smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+    
+  })) })) })) }))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### subdistricts and Stat Weeks Combined by district and age
+
+  PiR <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(S[d]), function(s){Reduce("+", lapply(seq(W), function(w){
+
+           INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+
+           xx = Reduce(cbind, by(output[[t]][[d]][[s]][[w]][[chain]], FUN = cbind, INDICES = INDEX))
+
+           dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), paste(rep(levels(INDEX), each = length(age_classes)), rep(age_classes, times = length(levels(INDEX))), sep = "_"))
+
+           xx / max(1, sum((n[t, d, , ] > 0) * h[t, d, , ]))
+
+         })) }))) })) }) })
+
+  PiR_district <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){
+
+                  zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, , ] > 0) * h[t, d, , ])))
+
+                  P0 <- apply(apply(Reduce(rbind, PiR[[t]][[d]]), 2, "<", value = zero), 2, mean)
+
+                  smmry <- Reduce(cbind, summary(PiR[[t]][[d]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+
+                  GR <- gelman.diag(PiR[[t]][[d]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+
+                  group <-  rep(group_names[!is.na(group_names[, d]), d], each = length(age_classes))
+                  
+                  age <- rep(age_classes, times = sum(!is.na(group_names[, d])))
+
+                  suppressWarnings(data.frame(group = group, age = age, year = years2run[t], district = districts[d], subdistrict = "all", statweek = "all", smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+
+                })) }))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Stat Weeks Combined by subdistrict and age
+
+  PiR <- lapply(seq(T), function(t){ lapply(seq(D), function(d){ lapply(seq(S[d]), function(s){ as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(W), function(w){
+    
+    INDEX <- factor(rep(group_names[!is.na(group_names[, d]), d], times = (nreps - burn) / thin), group_names[!is.na(group_names[, d]), d])
+    
+    xx = Reduce(cbind, by(output[[t]][[d]][[s]][[w]][[chain]], FUN = cbind, INDICES = INDEX))
+    
+    dimnames(xx) <- list(paste0("rep", seq(burn + thin, nreps, by = thin)), paste(rep(levels(INDEX), each = length(age_classes)), rep(age_classes, times = length(levels(INDEX))), sep = "_"))
+    
+    xx / max(1, sum((n[t, d, s, ] > 0) * h[t, d, s, ]))
+    
+  }))) })) }) }) })
+  
+  PiR_subdistrict <- Reduce(rbind, lapply(seq(T), function(t){ Reduce(rbind, lapply(seq(D), function(d){ Reduce(rbind, lapply(seq(S[d]), function(s){
+    
+    zero <- ifelse(is.numeric(zero), zero, 0.5 / max(1, sum((n[t, d, s, ] > 0) * h[t, d, s, ])))
+    
+    P0 <- apply(apply(Reduce(rbind, PiR[[t]][[d]][[s]]), 2, "<", value = zero), 2, mean)
+    
+    smmry <- Reduce(cbind, summary(PiR[[t]][[d]][[s]], quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)]
+    
+    GR <- gelman.diag(PiR[[t]][[d]][[s]], autoburnin = FALSE, multivariate = FALSE)[[1]][, 1]
+    
+    group <-  rep(group_names[!is.na(group_names[, d]), d], each = length(age_classes))
+    
+    age <- rep(age_classes, times = sum(!is.na(group_names[, d])))
+    
+    suppressWarnings(data.frame(group = group, age = age, year = years2run[t], district = districts[d], subdistrict = subdistricts[[d]][s], statweek = "all", smmry, GR = GR, P0 = P0, stringsAsFactors = FALSE))                
+    
+  })) })) }))
+  
+  
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  write.table(Reduce(rbind, list(R_statweek = R_statweek, R_subdistrict = R_subdistrict, R_district = R_district, R_subdistrict_statweek = R_subdistrict_statweek)), "output/magma_summariesNonagesGroups.txt", row.names = TRUE, col.names = NA, quote = FALSE)
+  
+  write.table(Reduce(rbind, list(PiR_subdistrict = PiR_subdistrict, PiR_district = PiR_district)), "output/magma_summariesAgesGroups.txt", row.names = TRUE, col.names = NA, quote = FALSE)
+  
+  # Getting samples sizes
+  ntab <- as.data.frame.table(x = tapply(metadat$i, metadat[, -c(ncol(metadat) - 1, ncol(metadat))], length), responseName = "n_total")
+  
+  ntab <- merge(x = ntab, y = as.data.frame.table(tapply(colsum(x, group = c(rep(1, sum(nalleles)), rep(2, T * C)))[, 1] != 0 & is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "wild_genetics"))
+  
+  ntab <- merge(x = ntab, y = as.data.frame.table(tapply(colsum(x, group = c(rep(1, sum(nalleles)), rep(2, T * C)))[, 1] == 0 & is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "wild_no_genetics"))
+  
+  ntab <- merge(x = ntab, y = as.data.frame.table(tapply(!is.na(metadat$i), metadat[, -c(ncol(metadat) - 1, ncol(metadat))], sum), responseName = "non_wild"))
+  
+  ntab$w <- factor(ntab$w, seq(W)) 
+  
+  harvest$STAT_WEEK <- factor(harvest$STAT_WEEK, seq(W))
+  
+  colnames(ntab)[seq(ncol(harvest) - 1)] <- colnames(harvest)[seq(ncol(harvest) - 1)]
+  
+  nhtab <- sort_df(merge(ntab, harvest)) 
+ 
+   nhtab[is.na(nhtab)] <- 0 
+   
+   write.csv(nhtab, "output/sample_size_&_harvest_table.csv")  # this was changed from: write.csv(nhtab, "output/sample_size_&_harvest_tableNB.csv")
+   # for compatibility with later scripts. I think this was a copy / paste issue on GEN3. 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Modifying selected districts to allow for combining stat weeks
+   
+# D108 combined ages, subdistricts, & statweeks 32-34 
+
+   t <- 1   # = match("2018", years2run)
+   
+   d <- 2   # = match("108", districts)
+   
+   my_statweeks <- match(c("32","33", "34"), stat_weeks)
+   
+   R <- as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(S[d]), function(s){ Reduce("+", lapply(my_statweeks, function(w){
+     
+     Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = factor(rep(na.omit(group_names[, d]), times = (nreps - burn) / thin), na.omit(group_names[,d])), c, simplify = FALSE)) 
+     
+   })) })) / sum((!!n[t, d, , my_statweeks]) * h[t, d, , my_statweeks]))  }))
+   
+   
+   
+   R108_32_33_34 <- data.frame(year = years2run[t], district = districts[d], subdistrict = "all", statweek = paste(my_statweeks, collapse = ","), 
+                               
+                               Reduce(cbind, summary(R, quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)], 
+                               
+                               GR = gelman.diag(R, autoburnin = FALSE, multivariate = FALSE)[[1]][, 1], 
+                               
+                               P0 =  apply(apply(Reduce(rbind, R), 2, "<", value = 0.5 / sum((!!n[t, d, , my_statweeks]) * h[t, d, , my_statweeks])), 2, mean),  
+                               
+                               row.names = na.omit(group_names[, d]), stringsAsFactors = FALSE)                
+   
+   write.table(Reduce(rbind, list(R108_32_33_34 = R108_32_33_34)), "output/D8_weeksModified.txt", row.names = TRUE, col.names = NA, quote = FALSE)
+   
+   
+   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+   # D111 combined ages, subdistricts, & statweeks 32-33 
+   
+   t <- 1   # = match("2018", years2run)
+   
+   d <- 3   # = match("111", districts)
+   
+   my_statweeks <- match(c("32","33"), stat_weeks)
+   
+   R <- as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(seq(S[d]), function(s){ Reduce("+", lapply(my_statweeks, function(w){
+     
+     Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = factor(rep(na.omit(group_names[, d]), times = (nreps - burn) / thin), na.omit(group_names[,d])), c, simplify = FALSE)) 
+     
+   })) })) / sum((!!n[t, d, , my_statweeks]) * h[t, d, , my_statweeks]))  }))
+   
+   
+   
+   R111_32_33 <- data.frame(year = years2run[t], district = districts[d], subdistrict = "all", statweek = paste(my_statweeks, collapse = ","), 
+                               
+                               Reduce(cbind, summary(R, quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)], 
+                               
+                               GR = gelman.diag(R, autoburnin = FALSE, multivariate = FALSE)[[1]][, 1], 
+                               
+                               P0 =  apply(apply(Reduce(rbind, R), 2, "<", value = 0.5 / sum((!!n[t, d, , my_statweeks]) * h[t, d, , my_statweeks])), 2, mean),  
+                               
+                               row.names = na.omit(group_names[, d]), stringsAsFactors = FALSE)                
+   
+   
+   
+   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   
+   write.table(Reduce(rbind, list(R111_32_33 = R111_32_33)), "output/D11_weeksModified.txt", row.names = TRUE, col.names = NA, quote = FALSE)
+   
+   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ## adjusting to combine weeks 26 and 28 to create an estimate for sw27 D10641
+   
+   t <- 1   # = match("2018, years2run)
+   
+   d <- 1  # = match("106", districts)
+   
+   s <- match(c("41"), subdistricts[[d]])
+   
+   my_statweeks <- match(c("26", "28"), stat_weeks)
+   
+   R <- as.mcmc.list(lapply(seq(nchains), function(chain){ mcmc(Reduce("+", lapply(my_statweeks, function(w){
+     
+     Reduce(cbind, tapply(apply(output[[t]][[d]][[s]][[w]][[chain]], 1, sum), INDEX = factor(rep(na.omit(group_names[, d]), times = (nreps - burn) / thin), na.omit(group_names[,d])), c, simplify = FALSE)) 
+     
+   })) / sum((!!n[t, d, s, my_statweeks]) * h[t, d, s, my_statweeks]))  }))
+   
+   
+   
+   R10641_26_28 <- data.frame(year = years2run[t], district = districts[d], subdistrict = subdistricts[[d]][s], statweek = paste(my_statweeks, collapse = ","), 
+                               
+                               Reduce(cbind, summary(R, quantiles = c(alpha / 2, 1 - alpha / 2)))[, c(1, 2, 5, 6)], 
+                               
+                               GR = gelman.diag(R, autoburnin = FALSE, multivariate = FALSE)[[1]][, 1], 
+                               
+                               P0 =  apply(apply(Reduce(rbind, R), 2, "<", value = 0.5 / sum((!!n[t, d, s, my_statweeks]) * h[t, d, s, my_statweeks])), 2, mean),  
+                               
+                               row.names = na.omit(group_names[, d]), stringsAsFactors = FALSE)  
+   
+   write.table(Reduce(rbind, list(R10641_26_28 = R10641_26_28)), "output/D10641_weeksModified.txt", row.names = TRUE, col.names = NA, quote = FALSE)
+   
+   
