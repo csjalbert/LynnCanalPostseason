@@ -3,12 +3,12 @@
 
 <b> Project Overview </b> 
 
-This is a post-season analysis of Lynn Canal D115 fishery. I want an age-specific stock composition for all major contributing age classes (>5%; 1.2, 1.3, 2.2, 2.3, other) using mark- and age-enhanced genetic mixed-stock analysis (MAGMA).    
+This is a post-season analysis of Lynn Canal D115 fishery. We want an age-specific stock composition for all major contributing age classes (>5%; 1.2, 1.3, 2.2, 2.3, other) using mark- and age-enhanced genetic mixed-stock analysis (MAGMA).    
 
-For the purposes of this project, I am just concerend about the breakdown by age, across all statweeks, and statareas. I will assign <b>all</b> stat areas as 115-<i>00</i>, since this doesnt exist and is currently how stat area is recorded.    
+For the purposes of this project, we are concerend about the breakdown by age, across all statweeks, and statareas. I will assign <b>all</b> stat areas as 115-<i>00</i>, since this subdistrict doesn't exist and is currently how stat area is recorded.    
  
-Total season estimates are to be provided by age group. The algorithm will be run for 40 000 repititions, and the first 20 000 repititions will be discarded.    
+Total season estimates are to be provided by age group. The MAGMA algorithm will be run for 40 000 repititions, and the first 20 000 repititions will be discarded.     
 
-Deliverables: 
+Final deliverables: 
     
     Point estimates, Credibility intervals
