@@ -12,3 +12,14 @@ Total season estimates are to be provided by age group. The MAGMA algorithm will
 Final deliverables: 
     
     Point estimates, Credibility intervals
+
+There are 4 steps to this pipeline which involve data preparation, cleaning, model setup, model running, and data summary. 
+Very briefly, the steps are as follows: 
+# 1- Data Cleanup 
+This takes creates the directory structure, analyizes ASL, Genetic, and harvest data, and creates population grouping objects. 
+# 2- Workspace Setup
+This creates the workspaces required for running the MAGMA model. 
+# 3- Model Run
+Runs the MAGMA model...
+# 4- Summary
+Converts model output into something more usable (R or Excel format) and performs QC steps to check for model issues. Finally, summary tables are created for distribution / reporting. 
