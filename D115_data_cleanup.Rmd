@@ -1,6 +1,6 @@
 ---
 title: "2018 Lynn Canal MAGMA"
-date: "01/14/2019"
+date: "01/28/2019"
 editor_options:
   chunk_output_type: inline
 output:
@@ -29,20 +29,27 @@ Total season estimates are to be provided by age group. The algorithm will be ru
 Deliverables: 
     
     Point estimates, Credibility intervals
+<b> Script Overview </b>
 
+The purpose of this script is to prepare the MAGMA data. Here I am going to work thorugh catch, harvest, and ASL data and output the MAGMA required format. I will carry out a bit of data QA and fix any outstanding data issues.    
+
+After this, I will run the MAGMA setup script to setup the MAGMA workspace and perform analysis. 
+
+
+<b> Begin Data Cleanup </b>
 
 ### Make MAGMA directory structure ###
 
 Note: dir.create() is nice because it doesn't overwrite existing directories. If it already exists you'll simply get a warning.
 
 ```{r create_dirs}
-dir.create(file.path("../troubleshoot/", "MAGMA")) # create MAGMA directory. 
+dir.create(file.path("../2019//", "MAGMA")) # create MAGMA directory. 
 
-dir.create(file.path("../troubleshoot/MAGMA", "analysis")) # create analysis subdir. 
+dir.create(file.path("../2019//MAGMA", "analysis")) # create analysis subdir. 
 
-dir.create(file.path("../troubleshoot/MAGMA", "data")) # create data subdir. 
+dir.create(file.path("../2019//MAGMA", "data")) # create data subdir. 
 
-dir.create(file.path("../troubleshoot/MAGMA", "output")) # create output subdir. 
+dir.create(file.path("../2019//MAGMA", "output")) # create output subdir. 
 ```
 
 ### 1) Load ASL Metadata ###
@@ -53,7 +60,7 @@ I will rearrange, check missingness, verify genetic info, and check for dupolioc
 
 ```{r prepdata}
 metadata <-
-  read_csv(file = "../2018/Detailed ASL Samples_011519.csv")
+  read_csv(file = "../2019/Detailed ASL Samples_011519.csv")
 
 unique(metadata$`Stat Area`) # gives unique values for subdistricts.
 
@@ -83,7 +90,7 @@ metadata %>%
   filter(!is.na(`Dna Specimen No`)) %>%
   ggplot(aes(x = `Stat Week`, fill = District)) +
   geom_bar() +
-  xlim( min(metadata$`Stat Week`),  max(metadata$`Stat Week`)) +
+  scale_x_continuous( breaks = metadata$`Stat Week`, labels = metadata$`Stat Week`) +
   ylab("# DNA Samples") +
   ggtitle("Samples by Stat Week for District 115")
 ```
@@ -147,11 +154,12 @@ loki <-
   select( c(FK_FISH_ID, DNA_TRAY_CODE, DNA_TRAY_WELL_CODE, CAPTURE_DATE))
 ```
 
-First carry out a bit of doublechecking to make sure there is nothing goofy going on with the card numbers. 
-```{r loki_dups}
-# Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples. `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number. 
-#First check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits)
+First carry out a bit of doublechecking to make sure there is nothing goofy going on with the card numbers.    
 
+Unfortunately there are a mix of 100000XXXX and 000000XXXX WGCs in this year's samples. `Dna Specimen No` isn't enough for me to figure out the whole 10 digit WGC number.    
+
+I need to check and verify that there are no potential "duplicate" cards (i.e. cards with the same last 4 digits). If there arent then continue. If I find 'duplicates' then I'll have to dive into the datasheets and figure out what's what.
+```{r loki_dups}
 loki %>% 
   mutate(WGC_4digit = str_sub(string = DNA_TRAY_CODE, start =  -4)) %>%  # get last 4 digits of WGC
   group_by(WGC_4digit) %>%  # group by those 4 digits
@@ -195,7 +203,7 @@ Further investigation shows these cards are not in the sample shipment inventory
 ASL_genetic_clean <-
   ASL_genetic[!is.na(ASL_genetic$FK_FISH_ID), ] # remove the missing cards.
 
-#rm(list = c("missing", "ASL_genetic", "loki", "ASL", "metadata")) # Cleanup unnecessary dataframes.
+rm(list = c("missing", "ASL_genetic", "loki", "ASL", "metadata")) # Cleanup unnecessary dataframes.
 ```
 
 
@@ -226,14 +234,16 @@ MAGMA_meta$SOURCE <-
 ```
 
 ```{r metadata_export}
-write_tsv(x = MAGMA_meta, path = "../troubleshoot/MAGMA/data/metadata.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = MAGMA_meta, path = "../2019/MAGMA/data/metadata.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
 
 
 #### 2) Harvest Data ####
 
-I'm going to load in the harvest data for the 2018 season so I can check otut he harvest by district and by stat week.  The ultimate goal is to create a summary table of harvest at each district - subdistrict for each statweek.   For example: 
+I'm going to load in the harvest data for the 2018 season so I can check otut he harvest by district and by stat week. The ultimate goal is to create a summary table of harvest at each district - subdistrict for each statweek.   
+
+For example: 
     
     YEAR	DISTRICT	SUBDISTRICT	STAT_WEEK	HARVEST
     2018	106	30	25	50
@@ -251,36 +261,37 @@ Check out the data since its loaded and cleaned up. Also, see if we can identify
 harvest_raw %>% 
   ggplot(aes(x = `Stat Week`, y = `Number Of Animals (sum)` , fill = District )) +
   geom_col() +
-  xlim(25, 40) + 
+  scale_x_continuous( breaks = harvest_raw$`Stat Week`, labels = harvest_raw$`Stat Week`) +
   ylab("Total Sockeye Harvested") +
   ggtitle("Catch by Stat Week for District 115")
 ```
 
+Great, but it looks like we have a fair bit of harvest after week 34. Since I only have collection information to SW34, I am going to end the analysis here. Any age-comps after this will be projections and will be up to the managers.    
 
 Now, create a table of harvest by statweek and subdistrict.    
-It looks like we have a bit of harvest after week 34. Since I only have collection information to SW34, I am going to end the analysis here. Any age-comps after this will be projections. 
 
 ```{r}
 MAGMA_harv <- harvest_raw %>%
   select(c(Year, `Stat Area`, `Stat Week`, `Number Of Animals (sum)`)) %>%  # keeping only the important columns.
-  mutate(DISTRICT = str_sub(harvest_raw$`Stat Area`, start = 1, end = 3),
-         SUBDISTRICT = "00") %>%
+  mutate(DISTRICT = str_sub(harvest_raw$`Stat Area`, start = 1, end = 3), # just want the first three values of district (115)
+         SUBDISTRICT = "00") %>% # hard code subdistrict, b/c no -00 but we want to consider this fishery as one. 
   rename(STAT_WEEK = `Stat Week`,
          YEAR = Year,
          HARVEST = `Number Of Animals (sum)`) %>%
-  select(YEAR, DISTRICT, SUBDISTRICT, STAT_WEEK, HARVEST,-`Stat Area`)  %>%
+  select(YEAR, DISTRICT, SUBDISTRICT, STAT_WEEK, HARVEST,-`Stat Area`)  %>% # select only the important columns
   filter(STAT_WEEK < 35) %>% # only considering SW 24-34 due to available data. 
-  group_by(YEAR, DISTRICT, SUBDISTRICT, STAT_WEEK, STAT_WEEK) %>% 
-  summarize(HARVEST = sum(HARVEST)) %>% 
-  ungroup()
+  group_by(YEAR, DISTRICT, SUBDISTRICT, STAT_WEEK, STAT_WEEK) %>% # grouping to get summary harvest for each week
+  summarize(HARVEST = sum(HARVEST)) %>% # summary of harvest for each stat week
+  ungroup() # ungroup to get back to the by week list
 ``` 
 
 ```{r harvest_export}
-write_tsv(x = MAGMA_harv, path = "../troubleshoot/MAGMA/data/harvest.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = MAGMA_harv, path = "../2019/MAGMA/data/harvest.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
 
 ### Groups.txt and group_names.txt setup ###
+
 Now, I need to pull the new (2018) baseline information and update the groups.txt and group_names.txt files for MAGAMA. 
 
 ```{r prep_txt}
@@ -313,29 +324,27 @@ group_names <-
   as.data.frame(unique(groups4_pops239$GROUPS)) # find all unique groups, should be 4...
 
 group_names <- group_names %>% 
-  rename(D115 = `unique(groups4_pops239$GROUPS)`)
+  rename(D115 = `unique(groups4_pops239$GROUPS)`) # rename for MAGMA
 
 groups <- groups4_pops239 %>%
-  select(c(SILLY, D115))
+  select(c(SILLY, D115)) # select only important columns
 
 groups <- groups %>%
-  rename(SOURCE = SILLY)
+  rename(SOURCE = SILLY) # rename for MAGMA
 ```
 
 
 ```{r export_txt}
-write_tsv(x = group_names, path = "../troubleshoot/MAGMA/data/group_names.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double") # export object group_names
+write_tsv(x = group_names, path = "../2019/MAGMA/data/group_names.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double") # export object group_names
 
-write_tsv(x = groups, path = "../troubleshoot/MAGMA/data/groups.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = groups, path = "../2019/MAGMA/data/groups.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
- # Note- There are no marked fish, so do I need to add the last few groups to the groups.txt file?? I found them in Serena's old files (2016-2017)...
-BURN	1
-MAIN	1
-SPEE	1
-SWEE	1
-TAHL	1
-TATS	1
-TUYA	1
-KING	1
-TRAP	1
+Great, now I can move onto the MAGMA_setup script to prepare the MAGMA workspace and run the model.    
+
+In the interest of record keeping: 
+
+```{r}
+sessionInfo()
+```
+
