@@ -1,5 +1,5 @@
 ---
-title: "2018 Lynn Canal MAGMA"
+title: "2018 Lynn Canal MAGMA Data Cleanup and Prep"
 date: "01/28/2019"
 editor_options:
   chunk_output_type: inline
@@ -14,8 +14,6 @@ creator: Chase Jalbert
 ```{r libraries, message = FALSE}
 if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
   p_load(tidyverse) # use pacman to load or install+load necessary packages
-
-#source("C:/R/function_gcl.r")
 ```
 
 <b> Project Overview </b> 
