@@ -41,13 +41,13 @@ After this, I will run the MAGMA setup script to setup the MAGMA workspace and p
 Note: dir.create() is nice because it doesn't overwrite existing directories. If it already exists you'll simply get a warning.
 
 ```{r create_dirs}
-dir.create(file.path("../2019//", "MAGMA")) # create MAGMA directory. 
+dir.create(file.path("../2018/", "MAGMA")) # create MAGMA directory. 
 
-dir.create(file.path("../2019//MAGMA", "analysis")) # create analysis subdir. 
+dir.create(file.path("../2018/MAGMA", "analysis")) # create analysis subdir. 
 
-dir.create(file.path("../2019//MAGMA", "data")) # create data subdir. 
+dir.create(file.path("../2018/MAGMA", "data")) # create data subdir. 
 
-dir.create(file.path("../2019//MAGMA", "output")) # create output subdir. 
+dir.create(file.path("../2018/MAGMA", "output")) # create output subdir. 
 ```
 
 ### 1) Load ASL Metadata ###
@@ -58,7 +58,7 @@ I will rearrange, check missingness, verify genetic info, and check for dupolioc
 
 ```{r prepdata}
 metadata <-
-  read_csv(file = "../2019/Detailed ASL Samples_011519.csv")
+  read_csv(file = "../2018/Detailed ASL Samples_011519.csv")
 
 unique(metadata$`Stat Area`) # gives unique values for subdistricts.
 
@@ -232,7 +232,7 @@ MAGMA_meta$SOURCE <-
 ```
 
 ```{r metadata_export}
-write_tsv(x = MAGMA_meta, path = "../2019/MAGMA/data/metadata.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = MAGMA_meta, path = "../2018/MAGMA/data/metadata.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
 
@@ -284,7 +284,7 @@ MAGMA_harv <- harvest_raw %>%
 ``` 
 
 ```{r harvest_export}
-write_tsv(x = MAGMA_harv, path = "../2019/MAGMA/data/harvest.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = MAGMA_harv, path = "../2018/MAGMA/data/harvest.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
 
@@ -333,9 +333,9 @@ groups <- groups %>%
 
 
 ```{r export_txt}
-write_tsv(x = group_names, path = "../2019/MAGMA/data/group_names.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double") # export object group_names
+write_tsv(x = group_names, path = "../2018/MAGMA/data/group_names.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double") # export object group_names
 
-write_tsv(x = groups, path = "../2019/MAGMA/data/groups.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
+write_tsv(x = groups, path = "../2018/MAGMA/data/groups.txt", na = "NA", append = FALSE, col_names = TRUE, quote_escape = "double")
 ```
 
 Great, now I can move onto the MAGMA_setup script to prepare the MAGMA workspace and run the model.    

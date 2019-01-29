@@ -126,7 +126,7 @@ rm(groups7_pops239)
 Great, the baseline setup is complete and looks good (all 239 pops). Now I'll save "baseline.RData" to the MAGMA\data folder. This includes loci, LocusControl, OrderedPops, and all of the .gcl baseline objects.    
 
 ```{r}
-save.image("../2019/MAGMA/data/baseline.RData") # save the baseline workspace
+save.image("../2018/MAGMA/data/baseline.RData") # save the baseline workspace
 ```
 
 
@@ -196,7 +196,7 @@ nalleles <- LocusControl$nalleles[loci] # list of number of allels per locus
 
 
 ```{r export_mixture}
-save.image("../2019/MAGMA/data/mixture.RData") # export the mixture workspace
+save.image("../2018/MAGMA/data/mixture.RData") # export the mixture workspace
 ```
 
 The mixture setup is complete and there is a "mixture.RData" located within the MAGMA\data directory. This includes loci (named), LocusControl, sillyvecMix, nalleles, and nloci.    
@@ -223,7 +223,7 @@ Previously, MAGMA was created and used for TBR only. Now, we are expanding so th
 source("magma_data.R") # sources the magma_data function
 
 magma_data(
-  wd = "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2019/MAGMA/", # set working directory
+  wd = "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/", # set working directory
   loci_name = "loci", # name of loci object
   wildpops_name = "OrderedPops", # name of wild populations list
   years2run = 2018, # can only run single year at a time

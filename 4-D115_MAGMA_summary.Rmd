@@ -35,10 +35,9 @@ This script takes the MAGMA output and creates summary files along with a summar
 ```{r setup, include = FALSE}
 # This forces the working directory for ALL chunks in the notebook. Note that it must be run first, in the "setup" chunk or it will fail. 
 wd <-
-  "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2019/MAGMA/"
+  "V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/"
 
 knitr::opts_knit$set(root.dir = wd)
-
 ```
 
 ```{r libraries, message=FALSE}
@@ -186,7 +185,7 @@ endTime <- Sys.time()
 print(endTime - startTime)
 
 
-save.image("V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2019/MAGMA/output/D115summary40K.RData")
+save.image("V:/Analysis/1_SEAK/Sockeye/Mixture/Lynn Canal Postseason/2018/MAGMA/output/D115summary40K.RData")
 ```
 
 #### Summarize Data ####
@@ -613,20 +612,21 @@ PiR_subdistrict <-
 ### Check how the model worked using the Gelman–Rubin convergence diagnostic for multiple chains. Note that our standard is to re-run the model if GR exceeds 1.2, which sugggests non-convergence between chains.
 
 ```{r}
-GR_summary <- bind_cols(
+(
+  GR_summary <- bind_cols(
     R_statweek = range(R_statweek$GR),
     R_subdistrict = range(R_subdistrict$GR),
     R_district = range(R_district$GR),
     R_subdistrict_statweek = range(R_subdistrict_statweek$GR),
     PiR_district = range(PiR_district$GR),
     PiR_subdistrict = range(PiR_subdistrict$GR)
+  )
 )
 ```
 
-All looks good, none of the GR stats are greater than 1.2, so were in pretty good shape!
+All looks good, none of the GR stats are greater than 1.2, so were in pretty good shape! I'll proceed to export a few tables in a text format. 
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-```{r export_tables}
+```{r tables}
 write_tsv(
   Reduce(
     rbind,
@@ -653,6 +653,7 @@ write_tsv(
 ```
 
 
+Now calclate sample sizes for various statistics (e.g., alleles, loci, harvest, etc.).
 
 ```{r SampleSizes}
 ntab <-
@@ -706,12 +707,13 @@ Now that the data is in a useable format and everything looks okay, I can create
 #### 2) Summary Tables ####
 
 ```{r age_import}
-LYNN.ages <- read_tsv("output/magma_summariesAgesGroups.txt") # import the table containing ages
+(LYNN.ages <-
+   read_tsv("output/magma_summariesAgesGroups.txt")) # import the table containing ages
 ```
 
 
 ```{r age_tables}
-D115.ages <- LYNN.ages %>%
+(D115.ages <- LYNN.ages %>%
   filter(subdistrict == "0") %>%
   select(
     Age = age,
@@ -724,14 +726,30 @@ D115.ages <- LYNN.ages %>%
   ) %>%
   mutate(Age = ifelse(Age == "not", "Other", Age) # change the "not"'s in the age column to Other, as required in reports. 
   ) %>% 
-  arrange(Age, ReportingGroup) # sort by age, first then reporting groups.
+  arrange(Age, ReportingGroup) # sort by age, then reporting groups.
+)
+```
+
+A few QA checks.    
+
+I want to see if the means fall within the CIs and make sure everything adds to 1. 
+
+```{r final_QA}
+sum(D115.ages$Mean) # 1, looks good
+
+exceedCI <-
+  D115.ages %>%
+  mutate(withinCI = 
+           Mean - SD >= CI5 &
+           Mean + SD <= CI95) %>%  # check if mean +- SD falls outside of CIs (does not meet reporting criteria)
+  filter(withinCI == "FALSE") # show rows that fall outside of  CI;
 ```
 
 
 ```{r export_age_final}
 write_csv(
   x = D115.ages,
-  path = "output/D115_ages.csv",
+  path = "output/D115_age_comp.csv",
   na = "NA",
   append = FALSE
 )
