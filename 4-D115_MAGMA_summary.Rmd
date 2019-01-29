@@ -737,12 +737,14 @@ I want to see if the means fall within the CIs and make sure everything adds to 
 ```{r final_QA}
 sum(D115.ages$Mean) # 1, looks good
 
-exceedCI <-
-  D115.ages %>%
-  mutate(withinCI = 
-           Mean - SD >= CI5 &
-           Mean + SD <= CI95) %>%  # check if mean +- SD falls outside of CIs (does not meet reporting criteria)
-  filter(withinCI == "FALSE") # show rows that fall outside of  CI;
+(
+  exceedCI <-
+    D115.ages %>%
+    mutate(withinCI =
+             Mean - SD >= CI5 &
+             Mean + SD <= CI95) %>%  # check if mean +- SD falls outside of CIs (does not meet reporting criteria)
+    filter(withinCI == "FALSE")
+) # show rows that fall outside of  CI;
 ```
 
 
