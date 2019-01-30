@@ -743,14 +743,15 @@ sum(D115.ages$Mean) # 1, looks good
     mutate(withinCI =
              Mean - SD >= CI5 &
              Mean + SD <= CI95) %>%  # check if mean +- SD falls outside of CIs (does not meet reporting criteria)
-    filter(withinCI == "FALSE")
+    #filter(withinCI == "FALSE")
+    mutate(withinCI = ifelse(withinCI == "TRUE", "", withinCI))
 ) # show rows that fall outside of  CI;
 ```
 
 
 ```{r export_age_final}
 write_csv(
-  x = D115.ages,
+  x = exceedCI,
   path = "output/D115_age_comp.csv",
   na = "NA",
   append = FALSE
