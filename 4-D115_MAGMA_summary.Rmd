@@ -706,6 +706,8 @@ Now that the data is in a useable format and everything looks okay, I can create
 
 #### 2) Summary Tables ####
 
+
+Summary by age across all weeks (SW25-34) and districts (D115). 
 ```{r age_import}
 (LYNN.ages <-
    read_tsv("output/magma_summariesAgesGroups.txt")) # import the table containing ages
@@ -736,16 +738,6 @@ I want to see if the means fall within the CIs and make sure everything adds to 
 
 ```{r final_QA}
 sum(D115.ages$Mean) # 1, looks good
-
-(
-  exceedCI <-
-    D115.ages %>%
-    mutate(withinCI =
-             Mean - SD >= CI5 &
-             Mean + SD <= CI95) %>%  # check if mean +- SD falls outside of CIs (does not meet reporting criteria)
-    #filter(withinCI == "FALSE")
-    mutate(withinCI = ifelse(withinCI == "TRUE", "", withinCI))
-) # show rows that fall outside of  CI;
 ```
 
 
@@ -753,6 +745,50 @@ sum(D115.ages$Mean) # 1, looks good
 write_csv(
   x = exceedCI,
   path = "output/D115_age_comp.csv",
+  na = "NA",
+  append = FALSE
+)
+```
+
+
+Summary by statweek without ages. 
+
+```{r Nonage_import}
+(LYNN <-
+   read_tsv("output/magma_summariesNonAgesGroups.txt")) # import the table containing ages
+```
+
+
+```{r Nonage_tables}
+(D115 <- LYNN %>%
+  filter(subdistrict == "0") %>%
+  select(
+    District = district,
+    StatWeek = statweek,
+    ReportingGroup = group,
+    Mean,
+    SD,
+    CI5 = X5.,
+    CI95 = X95.,
+    P0
+  ) %>% 
+  arrange(StatWeek, ReportingGroup) # sort by age, then reporting groups.
+)
+```
+
+A few QA checks.    
+
+I want to see if the means fall within the CIs and make sure everything adds to 1. 
+
+```{r Nonage_final_QA}
+sum(D115$Mean) # 1, looks good
+```
+
+
+```{r export_Nonage_final}
+write_csv(
+  x = exceedCI,
+  path = "output/D115_by_sw.csv",
   na = "NA",
   append = FALSE
 )
