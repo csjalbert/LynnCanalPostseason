@@ -1,0 +1,94 @@
+---
+title: "2018 Lynn Canal RUBIAS / MAGMA comparison"
+date: "01/30/2019"
+editor_options:
+  chunk_output_type: inline
+output:
+  html_document:
+    df_print: paged
+subtitle: 
+creator: Chase Jalbert
+---
+
+    
+<b> Script Overview </b>
+
+We used rubias for the inseason estimates and  magma for the postseason estimates. I'd like to verify and compare the two models to make sure they somewhat jive (within ~5% ish). Due to differences in the models, I am expecting slightly different estimates but If the models vary wildly I will have to figure out why.
+
+```{r libraries, message=FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman) # install pacman, if not installed
+
+p_load(tidyverse, reshape2) # use pacman to load or install+load necessary packages
+```
+
+
+First, read in the MAGMA output then the RUBIAS output and create cleaned, filtered dataframes. 
+```{r read_data}
+MAGMA <-
+  read_csv("../2018/MAGMA/output/D115_by_sw.csv") %>% # import the magma model output
+  filter(ReportingGroup == "Chilkat Lake" |
+     ReportingGroup == "Chilkat Mainstem" |
+     ReportingGroup == "Chilkoot",
+     !StatWeek =="all") %>% # ignoring Other since it's a combination of muntilpe inseason groups. If these three are good, I will assume Other is good as well.
+  mutate(reporting_group = ReportingGroup,
+         stat_week = as.numeric(StatWeek),
+         mean = Mean, 
+         sd = SD, 
+         "5%" = CI5,
+         "95%" = CI95) %>% 
+  select(c(stat_week, reporting_group, mean, sd, "5%", "95%"))
+
+RUBIAS <-
+  read_csv(
+    "../../Lynn Canal Inseason/2018/Estimates tables/LynnCanal_2015-2018_Estimates.csv"
+  ) %>% # import the rubias model output
+  filter(year == "2018",
+     reporting_group == "Chilkat Lake" |
+     reporting_group == "Chilkat Mainstem" |
+     reporting_group == "Chilkoot") %>% 
+  select(c(stat_week, reporting_group, mean, sd, "5%", "95%"))
+```
+
+Now, join the dataframes to make the comparison. 
+
+```{r join_dfs}
+joined <- left_join(x = MAGMA,
+                    y = RUBIAS,
+                    by = c("stat_week","reporting_group"),
+                    suffix = c("_M", "_R"))  # join by common fields (e.g, reporting group and stat week) 
+```
+
+
+```{r}
+join.long <- joined %>% 
+  gather( key = variable, 
+          value = value,
+          -stat_week, -reporting_group) %>% 
+  filter(str_detect(variable, "mean"))
+
+
+ggplot(join.long, aes(x=stat_week, y=value, fill=variable)) +
+    geom_bar(stat='identity', position='dodge', width = 0.7) +
+  facet_wrap(~reporting_group)
+```
+
+```{r}
+meta <- read_tsv("../2018/MAGMA/data/metadata.txt")
+```
+
+```{r}
+meta %>%
+  mutate(STAT_WEEK = as.integer(STAT_WEEK)) %>% 
+  filter(!is.na(AGE_EUROPEAN)) %>% 
+  ggplot( aes(x= STAT_WEEK, y = AGE_EUROPEAN, fill = AGE_EUROPEAN)) + 
+  geom_col() 
+```
+
+
+Overall, this looks pretty good. Rubias and magma generally agree. However, there are a few descrepancies.    
+
+1) Mainstem, SW27: After looking at the age comps, it looks like this is drivien by ages (0x fish). SW 27 has the largest group of 0x fish and magma is likely sending them here.    
+
+2) SW 31, Chilkat Lake vs Chilkoot: Lake fish seem to get sent to Chilkoot. It looks like a high proportion of 2.2s may be related...     
+
+We're happy with the results and will format / tidy up the data then send it off.  
