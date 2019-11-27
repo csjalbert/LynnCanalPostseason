@@ -723,8 +723,7 @@ Summary by age across all weeks (SW25-34) and districts (D115).
     Mean,
     SD,
     CI5 = X5.,
-    CI95 = X95.,
-    P0
+    CI95 = X95.
   ) %>%
   mutate(Age = ifelse(Age == "not", "Other", Age) # change the "not"'s in the age column to Other, as required in reports. 
   ) %>% 
@@ -743,15 +742,15 @@ sum(D115.ages$Mean) # 1, looks good
 
 ```{r export_age_final}
 write_csv(
-  x = exceedCI,
-  path = "output/D115_age_comp.csv",
+  x = D115.ages,
+  path = "output/D115_age_estimates.csv",
   na = "NA",
   append = FALSE
 )
 ```
 
 
-Summary by statweek without ages. 
+Now, get the summary by statweek without ages. This is not given to managers but I need it to compare the rubias and magma estimates. I'll leave it here in case goals change in the future. 
 
 ```{r Nonage_import}
 (LYNN <-
@@ -769,8 +768,7 @@ Summary by statweek without ages.
     Mean,
     SD,
     CI5 = X5.,
-    CI95 = X95.,
-    P0
+    CI95 = X95.
   ) %>% 
   arrange(StatWeek, ReportingGroup) # sort by age, then reporting groups.
 )
