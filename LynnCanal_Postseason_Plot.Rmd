@@ -1,0 +1,84 @@
+---
+title: "Lynn Canal 2019 Postseason Stock Comp by SW"
+output:
+  html_notebook:
+    theme: united
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+# Background
+
+Nicole Zeiser called Kyle on 11/27/19 to ask if the summary plots from Lynn Canal Inseason (stacked bar by week) were "final". They are not, because we re-ran all of D115 with MAGMA to get stock by age estimates for the run reconstruction. The **goal** here is to read in the MAGMA output by stat week and recreate the same stacked bar plot of stock comp means.
+
+# Read Objects
+
+Need color and reporting group objects.
+```{r}
+LynnCanal_groups7 <- dget("../../Lynn Canal Inseason/2019/Objects/LynnCanal_groups7.txt")
+LynnCanalColors7 <- dget("../../Lynn Canal Inseason/2019/Objects/LynnCanalColors7.txt")
+```
+
+# Read Data
+
+There were multiple MAGMA runs, but Chase indicated that the final run was "80K_03to23"
+```{r}
+(stock_comp <- read_csv("../2019/MAGMA/output/80k_03to23/NonAges_by_sw_LYNN.csv"))
+```
+
+```{r}
+stock_comp %>% 
+  filter(subdistrict == "all" & StatWeek != "all") %>% 
+  mutate(StatWeek = as.numeric(StatWeek)) %>% 
+  mutate(ReportingGroup = factor(x = ReportingGroup, levels = LynnCanal_groups7))
+```
+
+```{r}
+(inseason_stock_comp <- read_csv("../2019/MAGMA/output/80k_03to23/inseason_groups/summaries/NonAges_by_sw_LYNNinseason.csv"))
+```
+
+```{r}
+inseason_stock_comp %>% 
+  filter(subdistrict == "all" & StatWeek != "all") %>% 
+  mutate(StatWeek = as.numeric(StatWeek)) %>% 
+  mutate(ReportingGroup = factor(x = ReportingGroup, levels = LynnCanal_groups7))
+```
+
+Make "inseason" type figure (note that we combined SW 25 and 26 for inseason)
+```{r fig.width=10}
+inseason_stock_comp %>% 
+  filter(subdistrict == "all" & StatWeek != "all") %>% 
+  mutate(StatWeek = as.numeric(StatWeek)) %>% 
+  mutate(ReportingGroup = factor(x = ReportingGroup, levels = LynnCanal_groups7)) %>% 
+  ggplot(aes(x = StatWeek, y = Mean * 100, fill = ReportingGroup)) +
+  geom_col(position = "stack", colour = "black") +
+  scale_fill_manual(values = LynnCanalColors7) +
+  scale_y_continuous(breaks = seq(0, 100, 20), limits = c(0, 100.1), expand = c(0, 0)) +
+  scale_x_continuous(breaks = 25:35) +
+  ggtitle("Comparison of Weekly Stock\nComposition Estimates") +
+  ylab("Stock Composition Estimates (%)") +
+  xlab("Stat Week") +
+  theme_classic(base_size = 18) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "right")
+
+ggsave(filename = "D115_sw_estimates_2019.png", path = "../2019/Updates/")
+```
+
+Save mean estimates by stat week as .csv so she can multiple by harvest.
+```{r}
+inseason_stock_comp %>% 
+  filter(subdistrict == "all" & StatWeek != "all") %>% 
+  mutate(StatWeek = as.numeric(StatWeek)) %>% 
+  mutate(ReportingGroup = factor(x = ReportingGroup, levels = LynnCanal_groups7)) %>% 
+  select(District, ReportingGroup, StatWeek, Mean) %>% 
+  spread(ReportingGroup, Mean) %>% 
+  write_csv(path = "../2019/Updates/D115_sw_estimates_2019.csv")
+```
+
