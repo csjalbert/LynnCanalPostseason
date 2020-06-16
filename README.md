@@ -1,5 +1,8 @@
 # LynnCanalPostseason
- This repository holds all scripts associated with analyzing sockeye salmon mixtures from Lynn Canal, D115 commercial samples as part of our postseason genetics project from 2018 forward. Specifically, it houses our MAGMA (Mark, Age, Genotype, Mixture Analysis) pipeline.
+
+**ARCHIVE ONLY - this code was used for prior to creation of an 'all-encompassing' MAGMA script. It is here for archive purposes but is no longer used or maintained. CJ 6/16/2020**
+
+This repository holds all scripts associated with analyzing sockeye salmon mixtures from Lynn Canal, D115 commercial samples as part of our postseason genetics project from 2018 forward. Specifically, it houses our MAGMA (Mark, Age, Genotype, Mixture Analysis) pipeline.
 
 <b> Project Overview </b> 
 
